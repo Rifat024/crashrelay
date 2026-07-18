@@ -1,0 +1,57 @@
+name: Publish to npm
+
+# Auto-publish on every push to main. Gates on a vulnerability audit and a
+# registry-signature check before publishing, and only runs npm publish when
+# the version in package.json isn't already on npm (so re-pushing main for
+# docs/refactors is a safe no-op). Bump package.json's version to release.
+#
+# Publishes with --provenance: a Sigstore-signed attestation linking the
+# published package to this exact commit/workflow run, verifiable on the
+# npm package page. Requires the `id-token: write` permission below; no
+# extra npmjs.com configuration needed.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Audit dependencies (fail on high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Verify registry signatures
+        run: npm audit signatures
+
+      - name: Publish to npm (only if the version changed)
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "✓ $NAME@$VERSION is already published — skipping."
+          else
+            echo "→ Publishing $NAME@$VERSION"
+            npm publish --access public --provenance
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
