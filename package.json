@@ -1,6 +1,6 @@
 {
   "name": "crashrelay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Catch backend crashes, HTTP 5xx responses, and error-log lines (plus frontend JS errors via crashrelay-browser) and auto-file tickets in Jira or GitHub Issues.",
   "license": "MIT",
   "main": "dist/index.js",
